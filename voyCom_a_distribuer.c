@@ -108,7 +108,7 @@ void afficher_cycle_html(const t_cycle cycle, double *posX, double *posY)
   if(fout != NULL)
     {
       int i;
-      fprintf(fout, "<html>\n <applet codebase=\".\" code=\"DisplayTsp.class\" width=200 height=200>\n");
+      fprintf(fout, "<html>\n <applet codebase=\".\" code=\"DisplayTsp.class\" width=500 height=500>\n");
       fprintf(fout, "<param name = Problem value = \"custom\">\n");
       fprintf(fout, "<param name = Problem CitiesPosX value = \"");
       for(i = 0; i < cycle.taille; i++)
@@ -235,10 +235,68 @@ void supprimer_aretes(const int nb_villes, double **T)
   free(T);
 }
 
-
-void PVC_EXACT_NAIF(t_cycle *cycle, const unsigned int nb_villes, const double *abscisses, const double *ordonness, const double **distances)
+// cycle et meilleur_cycle doivent être initialisés avant l'appel à la fonction
+void PVC_EXACT_NAIF(t_cycle *cycle, t_cycle *meilleur_cycle, const unsigned int nb_villes, const double **distances)
 {
-	
+	if(cycle->taille == 0)
+	{
+		cycle->c[0] = 0;
+		cycle->taille++;
+		/*
+		int i;
+
+		for(i=0;i<nb_villes;i++)
+		{
+			cycle->c[i] = -1;
+		}*/
+	}
+	if(meilleur_cycle->poids == 0 || cycle->poids < meilleur_cycle->poids)
+	{
+		if(cycle->taille < nb_villes)
+		{
+			int i;
+			for(i=1;i<nb_villes;i++)
+			{
+				int exists = 0;
+				int j;
+				for(j=0;j<cycle->taille;j++)
+				{
+					if(cycle->c[j] == i)
+					{
+						exists = 1;
+						break;
+					}
+				}
+				if(!exists)
+				{
+					cycle->c[cycle->taille] = i;
+					double poids = distances[cycle->c[cycle->taille-1]][i];
+					cycle->poids += poids;
+					cycle->taille++;
+					PVC_EXACT_NAIF(cycle,meilleur_cycle,nb_villes,distances);
+					cycle->taille--;
+					cycle->poids -= poids;
+				}
+			}
+		}
+		else
+		{
+			double poids = distances[cycle->c[0]][cycle->c[cycle->taille-1]];
+			cycle->poids += poids;
+			if(meilleur_cycle->poids == 0 || cycle->poids < meilleur_cycle->poids)
+			{
+				meilleur_cycle->taille = cycle->taille;
+				meilleur_cycle->poids = cycle->poids;
+				printf("%d | %f\n",cycle->taille,cycle->poids);
+				int i;
+				for(i=0;i<cycle->taille;i++)
+				{
+					meilleur_cycle->c[i] = cycle->c[i];
+				}
+			}
+			cycle->poids -= poids;
+		}
+	}
 }
 
 /**
@@ -258,27 +316,27 @@ int main (int argc, char *argv[])
   //Exemple de mesure du temps
   lire_donnees("defi250.csv", &nb_villes, &distances, &abscisses, &ordonnees);
 
-
-
+	t_cycle meilleur_cycle;
+	t_cycle cycle;
+	meilleur_cycle.taille = cycle.taille = 0;
+	meilleur_cycle.poids = cycle.poids = 0;
+	PVC_EXACT_NAIF(&cycle,&meilleur_cycle,15,distances);
 
   //Récupération du timer et affichage
   struct timespec current;
   clock_gettime(CLOCK_REALTIME, &current); //Linux gettime
   double elapsed_in_ms =    (( current.tv_sec - myTimerStart.tv_sec) *1000 +
           ( current.tv_nsec - myTimerStart.tv_nsec)/1000000.0);
-  printf("Temps passé (ms) : %lf\n", elapsed_in_ms);
+  printf("Temps passe (ms) : %lf\n", elapsed_in_ms);
 
+
+	printf("%d\n",meilleur_cycle.taille);
 
   //Affichage des distances
   //afficher_distances(nb_villes,distances);
 
   //naif
-  t_cycle cycle;
-  cycle.taille=3;
-  cycle.c[0]=0;
-  cycle.c[1]=1;
-  cycle.c[2]=2;
-  afficher_cycle_html(cycle, abscisses, ordonnees);
+  afficher_cycle_html(meilleur_cycle, abscisses, ordonnees);
   
   double ** Aretes =  trier_aretes(nb_villes, distances);
   /// <-- Kruskal Here
